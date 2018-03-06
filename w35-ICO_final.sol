@@ -1,5 +1,31 @@
 pragma solidity ^0.4.18;
 
+library SafeMath {
+  function mul(uint256 a, uint256 b) internal pure returns (uint256) {
+    if (a == 0) {
+      return 0;
+    }
+    uint256 c = a * b;
+    assert(c / a == b);
+    return c;
+  }
+  function div(uint256 a, uint256 b) internal pure returns (uint256) {
+    // assert(b > 0); // Solidity automatically throws when dividing by 0
+    uint256 c = a / b;
+    // assert(a == b * c + a % b); // There is no case in which this doesn't hold
+    return c;
+  }
+  function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+    assert(b <= a);
+    return a - b;
+  }
+  function add(uint256 a, uint256 b) internal pure returns (uint256) {
+    uint256 c = a + b;
+    assert(c >= a);
+    return c;
+  }
+}
+
 contract Ownable {
   address public owner;
 
@@ -27,11 +53,12 @@ interface TokenContract {
 }
 
 contract CrowdSale is Ownable {
-
+    using SafeMath for uint256;
+    
     TokenContract private tkn;
     address public tokenAddress;
     address private walletAddress;
-    uint16[7] private pricePerWave =  [2370, 2212, 2054, 1896, 1817, 1738, 1659];
+    uint256[7] private pricePerWave =  [2370, 2212, 2054, 1896, 1817, 1738, 1659];
     uint256[7] private tokensPerWave = [4474560000000000000000000, 13322560000000000000000000, 21538560000000000000000000,
                                         29122560000000000000000000, 36390560000000000000000000, 43342560000000000000000000,
                                         49978560000000000000000000];
@@ -91,7 +118,7 @@ contract CrowdSale is Ownable {
     
     function CrowdSale(address _tokenAddress) public {
         tokenAddress = _tokenAddress;            
-        tkn = TokenContract(tokenAddress);               
+        tkn = TokenContract(0xf1C7F8d79FD01cF16eF819B4A932E002f286F5d4);               
         icoStartTime = now;  // set the time !!!!!!!!!!!!!!!!!!!!
         icoEndTime = icoStartTime + (90 * 1 days);  
         walletAddress = msg.sender;
@@ -126,7 +153,7 @@ contract CrowdSale is Ownable {
     function makeRefund(address _toWho, uint256 _amount) private {
         uint256 amount;
         if (_amount > refundPrice) {
-            amount = _amount - refundPrice;
+            amount = _amount.sub(refundPrice);
             investors[_toWho].amountWei = 0;
             if (this.balance > amount) {
                 _toWho.transfer(amount);
@@ -139,7 +166,7 @@ contract CrowdSale is Ownable {
         for (uint256 i = 0; i < secondWaveInvestors.length; i++) {
            amount = investors[secondWaveInvestors[i]].amountWei;
             if ((amount > refundPrice) ) {
-            amountWeiRised -= amount;
+            amountWeiRised = amountWeiRised.sub(amount);
             makeRefund(secondWaveInvestors[i], amount);
             } 
         }   
@@ -152,10 +179,12 @@ contract CrowdSale is Ownable {
         sendTokens(walletAddress, actualTokenBalance);
     }
 
+    // clean de blockchain and get the gas
     function terminateContract() onlyOwner icoIsFinished public {
         selfdestruct(walletAddress);
     }
 
+    // check if the period is ok and extend ICO if needed
     function validPurchase() internal returns (bool) {
         bool withinPeriod = now >= icoStartTime && now <= icoEndTime;
         if (icoFinished) {return false;}
@@ -174,27 +203,30 @@ contract CrowdSale is Ownable {
     }
 
     function sendTokens(address _investor, uint256 _tokensToSend) private {
+        // with a require to ensure that the tokens where sent
         require(tkn.transfer(_investor, _tokensToSend));                 
     }
 
+    // determine if the invested ammount need to be split in 2 waves
     function executeSell(address _investor, uint256 _investedWei) private {
         uint256 tokensToBuy;
        if ((_investedWei + amountWeiRised) > (weisPerWave[currentWave])) {
             multiWaveSell(_investor, _investedWei);
         } else {
-            tokensToBuy = pricePerWave[currentWave] * _investedWei;
+            tokensToBuy = pricePerWave[currentWave].mul(_investedWei);
             singleWaveSell(_investor, _investedWei, tokensToBuy);
         }
     }
 
     function singleWaveSell(address _investor, uint256 _investedWei, uint256 _tokensToBuy) private {
-        investors[_investor].amountToken += _tokensToBuy;
-        if (currentWave > 0) {investors[_investor].amountWei += _investedWei;}
-        amountWeiRised += _investedWei;
-        tokensSold += _tokensToBuy; 
+        investors[_investor].amountToken = investors[_investor].amountToken.add(_tokensToBuy);
+        if (currentWave > 0) {investors[_investor].amountWei = investors[_investor].amountWei.add(_investedWei);}
+        amountWeiRised = amountWeiRised.add(_investedWei);
+        tokensSold = tokensSold.add(_tokensToBuy); 
         NewInvestment(_investor, _investor, _investedWei, currentWave); 
         if (!softCapReached) {
             preSoftCapSell(_investor, _tokensToBuy, _investedWei);
+           // sendTokens(_investor, _tokensToBuy);
             }  else {sendTokens(_investor, _tokensToBuy);} 
     }
 
@@ -204,34 +236,34 @@ contract CrowdSale is Ownable {
         uint256 returnToInvestor;
         uint256 tokensToBuy;
         if (currentWave == 6) {
-            sellFromCurrent = (weisPerWave[6]) - amountWeiRised;
-            returnToInvestor = _investedWei - sellFromCurrent;
-            tokensToBuy = pricePerWave[currentWave] * sellFromCurrent;
+            sellFromCurrent = (weisPerWave[6]).sub(amountWeiRised);
+            returnToInvestor = _investedWei.sub(sellFromCurrent);
+            tokensToBuy = pricePerWave[currentWave].mul(sellFromCurrent);
             singleWaveSell(_investor, sellFromCurrent, tokensToBuy);
             _investor.transfer(returnToInvestor);
             icoFinished = true;
         }   else {
-            sellFromCurrent = (weisPerWave[currentWave]) - amountWeiRised;
-            sellFromNext = _investedWei - sellFromCurrent;
-            tokensToBuy = pricePerWave[currentWave] * sellFromCurrent;
+            sellFromCurrent = (weisPerWave[currentWave]).sub(amountWeiRised);
+            sellFromNext = _investedWei.sub(sellFromCurrent);
+            tokensToBuy = pricePerWave[currentWave].mul(sellFromCurrent);
             singleWaveSell(_investor, sellFromCurrent, tokensToBuy);
             currentWave += 1;
             if (currentWave > 1) {softCapReached = true;}
-            tokensToBuy = pricePerWave[currentWave] * sellFromNext;
+            tokensToBuy = pricePerWave[currentWave].mul(sellFromNext);
             singleWaveSell(_investor, sellFromNext, tokensToBuy);
         } 
     }
 
     function preSoftCapSell(address _investor, uint256 _tokens,uint256  _investedWei) private {
         if (currentWave == 0) {
-            investors[_investor].amountUnsent += _tokens;   
+            investors[_investor].amountUnsent = investors[_investor].amountUnsent.add(_tokens);   
             preIcoInvestors.push(_investor);
             if (_investedWei <= this.balance) {
                  preIcoWallet.transfer(_investedWei);
             }
 
         } else {
-            investors[_investor].amountUnsent += _tokens;
+            investors[_investor].amountUnsent = investors[_investor].amountUnsent.add(_tokens);
             secondWaveInvestors.push(_investor);
         }
     }
@@ -259,7 +291,7 @@ contract CrowdSale is Ownable {
         uint256 amount = investors[toWho].amountWei;
         if (amount > refundPrice) {
             makeRefund(toWho, amount);
-            amountWeiRised -= amount;
+            amountWeiRised = amountWeiRised.sub(amount);
             return true;
         } else {return false;}
     }
