@@ -117,9 +117,7 @@ contract CrowdSale is Ownable {
     }
     
     function CrowdSale() public {
-        // require(_tokenAddress != address(0));    
-        address _tokenAddress = 0x0;    // set the address 
-        tkn = TokenContract(_tokenAddress);               
+        tkn = TokenContract(0x0 );               // set the address
         icoStartTime = now; // here the start time
         icoEndTime = icoStartTime + (90 * 1 days);  
         walletAddress = msg.sender;
