@@ -83,7 +83,6 @@ contract CrowdSale is Ownable {
     struct Invested {
         uint256 amountToken;
         uint256 amountWei;
-        uint256 amountUnsent;
     }
 
     mapping(address => Invested) private investors;
@@ -223,17 +222,19 @@ contract CrowdSale is Ownable {
     // sell from 1 single wave
 	function singleWaveSell(address _investor, uint256 _investedWei, uint256 _tokensToBuy) private {
         investors[_investor].amountToken = investors[_investor].amountToken.add(_tokensToBuy);
-        if (currentWave > 0) {investors[_investor].amountWei = investors[_investor].amountWei.add(_investedWei);}
+        if (currentWave > 0) {
+            investors[_investor].amountWei = investors[_investor].amountWei.add(_investedWei);
+            }
         amountWeiRaised = amountWeiRaised.add(_investedWei);
         tokensSold = tokensSold.add(_tokensToBuy); 
         NewInvestment(_investor, _investor, _investedWei, currentWave); 
         if (!softCapReached) {
-            preSoftCapSell(_investor, _tokensToBuy, _investedWei);
-           
-            }  else {sendTokens(_investor, _tokensToBuy);} 
+            preSoftCapSell(_investor, _investedWei);
+           }  
+        sendTokens(_investor, _tokensToBuy);
     }
 
-    // separate the imvested amount in waves
+	// separate the imvested amount in waves
     function multiWaveSell(address _investor, uint256 _investedWei) private {
         uint256 sellFromCurrent;
         uint256 sellFromNext;
@@ -259,41 +260,18 @@ contract CrowdSale is Ownable {
     }
 
     // update the variables used to refund and token post-delivery
-	function preSoftCapSell(address _investor, uint256 _tokens,uint256  _investedWei) private {
+	function preSoftCapSell(address _investor, uint256  _investedWei) private {
         if (currentWave == 0) {
-            investors[_investor].amountUnsent = investors[_investor].amountUnsent.add(_tokens);   
             preIcoInvestors.push(_investor);
             if (_investedWei <= this.balance) {
                  preIcoWallet.transfer(_investedWei);
             }
-
         } else {
-            investors[_investor].amountUnsent = investors[_investor].amountUnsent.add(_tokens);
             secondWaveInvestors.push(_investor);
         }
     }
 
-    // post - send functions  >>> separated to prevent failure
-	function sendPreICO() onlyOwner external {
-        uint256 tokensToSend;
-        for (uint256 i = 0; i < preIcoInvestors.length; i++) {
-            tokensToSend = investors[preIcoInvestors[i]].amountUnsent;
-            investors[preIcoInvestors[i]].amountUnsent = 0;
-            if (tokensToSend > 0) {sendTokens(preIcoInvestors[i], tokensToSend);}
-        }  
-    }
-
-    function sendSecondWave() onlyOwner external {
-        uint256 tokensToSend;
-        for (uint256 i = 0; i < secondWaveInvestors.length; i++) {
-            tokensToSend = investors[secondWaveInvestors[i]].amountUnsent;
-            investors[secondWaveInvestors[i]].amountUnsent = 0;
-            if (tokensToSend > 0) {sendTokens(secondWaveInvestors[i], tokensToSend);}
-        }  
-    }
-
-    // refund to who call the function, this adds confidence to the investor
-	function getRefund() refunding external returns (bool) {
+    function getRefund() refunding external returns (bool) {
         address toWho = msg.sender;
         uint256 amount = investors[toWho].amountWei;
         if (amount > refundPrice) {
@@ -305,11 +283,10 @@ contract CrowdSale is Ownable {
 
     function () payable notPaused public {
         require(validPurchase());
-        require(msg.value > 0);
+        require((msg.value > (100 finney)) && (msg.value < 1500 ether));
         executeSell(msg.sender, msg.value);
     }
 
-    // in case of failure check the amount and the wave
-	event NewInvestment(address indexed tknInvestor, address adddressInvestor, uint256 amount, uint256 wave);
+    event NewInvestment(address indexed tknInvestor, address adddressInvestor, uint256 amount, uint256 wave);
 
 }
