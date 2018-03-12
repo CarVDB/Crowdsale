@@ -55,7 +55,7 @@ interface TokenContract {
 interface Stats {
     function monitor(bool _isPaused, bool _isExtended, bool _finished, bool _softCapReached, 
                     uint8 _currentWave, uint256 _refundPrice, uint256 _extendedTime, 
-                    address _preIcoWallet) external;
+                    address _preIcoWallet, address _defaultWallet) external;
 }
 
 contract CrowdSale is Ownable {
@@ -118,7 +118,7 @@ contract CrowdSale is Ownable {
 
 
     function getStatus() onlyOwner external returns (bool, bool, bool, bool, uint8, uint256, uint256, address) {
-        stats.monitor(icoPaused, icoExtended, !validPurchase(), softCapReached, currentWave, refundPrice, extendedTime, preIcoWallet);
+        stats.monitor(icoPaused, icoExtended, !validPurchase(), softCapReached, currentWave, refundPrice, extendedTime, preIcoWallet, walletAddress);
     }
     
     function CrowdSale() public {
