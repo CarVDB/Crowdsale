@@ -20,6 +20,7 @@ contract Ownable {
 
 }
 
+
 contract Stats is Ownable {
     bool public isPaused;
     bool public isExtended;
@@ -29,23 +30,35 @@ contract Stats is Ownable {
     uint256 public refundPrice;
     uint256 public extendedTime;
     address public preIcoWallet;
+    address public defaultWallet;
+    address public icoContract;
 
-    function monitor(bool _isPaused, bool _isExtended, bool _finished, bool _softCapReached, 
-                    uint8 _currentWave, uint256 _refundPrice, uint256 _extendedTime, 
-                    address _preIcoWallet) public 
-                    {
-        isPaused = _isPaused;
-        isExtended = _isExtended;
-        finished = _finished;
-        softcapReached = _softCapReached;
-        currentWave = _currentWave;
-        refundPrice = _refundPrice;
-        extendedTime = _extendedTime;
-        preIcoWallet = _preIcoWallet;
-    }
+  modifier onlyContract() {
+    require(msg.sender == icoContract);
+    _;
+  }
 
-    function terminateContract() onlyOwner external {
-        selfdestruct(owner);
-    }
+  function monitor(bool _isPaused, bool _isExtended, bool _finished, bool _softCapReached, 
+                  uint8 _currentWave, uint256 _refundPrice, uint256 _extendedTime, 
+                  address _preIcoWallet, address _defaultWallet) onlyContract public 
+                  {
+      isPaused = _isPaused;
+      isExtended = _isExtended;
+      finished = _finished;
+      softcapReached = _softCapReached;
+      currentWave = _currentWave;
+      refundPrice = _refundPrice;
+      extendedTime = _extendedTime;
+      preIcoWallet = _preIcoWallet;
+      defaultWallet = _defaultWallet;
+  }
+
+  function terminateContract() onlyOwner external {
+      selfdestruct(owner);
+  }
+
+  function setIcoContract(address _icoContract) onlyOwner external {
+    icoContract = _icoContract;
+  }
 
 }
